@@ -23,11 +23,11 @@ double mp = 0.5, L = 1.0, g = 9.8, Izz = mp*L*L/12;
 
 geometry_msgs::PoseStamped leader_pose;
 geometry_msgs::TwistStamped leader_vel;
-Eigen::Vector3d pose, vel, ang, w_imu;
+Eigen::Vector3d pose, vel, ang;
 Eigen::Vector4d ori;
-Eigen::Vector3d v_p, w_pl_B;
+Eigen::Vector3d v_p;
 Eigen::Vector3d FL_des;
-Eigen::Vector3d r_c2_p(0.5, 0, 0);
+Eigen::Vector3d r_p_c2(-0.5, 0, 0);
 double vir_x, vir_y, theta_r, vx, vy, ax, ay, jx, jy;
 double last_w = 0.0;
 
@@ -43,7 +43,7 @@ bool flag = false;
 
 Eigen::Matrix3d R_pl_B;
 Eigen::Matrix3d uav_rotation;
-Eigen::Vector3d w_c1_I;
+Eigen::Vector3d w_;
 
 geometry_msgs::PoseStamped desired_pose;
 geometry_msgs::Point record_pose;
@@ -76,14 +76,13 @@ void imu1_cb(const sensor_msgs::Imu::ConstPtr& msg){
          imu_data.angular_velocity.y,
          imu_data.angular_velocity.z;
 
-  w_imu = tmp;
-  w_c1_I = payload_Rotation * tmp;
+  w_ << 0, 0, tmp(2);
 }
 
 void est_vel_cb(const geometry_msgs::Point::ConstPtr& msg){
   Eigen::Vector3d vc1 = Eigen::Vector3d(msg->x, msg->y, msg->z);
   Eigen::Vector3d r_c1p = Eigen::Vector3d(-0.5, 0.0, 0.0);
-  v_p = vc1 + w_c1_I.cross(r_c1p);
+  v_p = R_pl_B*vc1; // + w_.cross(r_c1p);
 }
 
 void pc2_cb(const geometry_msgs::Point::ConstPtr& msg){
@@ -124,8 +123,8 @@ Eigen::Vector3d nonholonomic_output(double x_r, double y_r, double theta_r, doub
   err_state << x_r - pc2_est(0), y_r - pc2_est(1), theta_r - payload_yaw; // +(PI/2);
   err_state_B = R_pl_B * err_state;
 
-  x_e = err_state_B(0);  //err_state_B.norm();       //err_state_B.norm();
-  y_e = err_state_B(1);  //err_state_B.norm();       //err_state_B.norm();
+  x_e = err_state_B(0);
+  y_e = err_state_B(1);
   theta_e = err_state(2);
 
   double vd = v_r*cos(theta_e) + k1*x_e;
@@ -139,7 +138,6 @@ int main(int argc, char **argv){
 
   ros::init(argc, argv, "geo");
   ros::NodeHandle nh;
-  ROS_INFO("Hello world!");
 
   ros::Publisher feedforward_pub = nh.advertise<geometry_msgs::Point>("/feedforward",2);
   ros::Publisher desired_pose_pub = nh.advertise<geometry_msgs::Point>("/drone1/desired_position",2);
@@ -247,29 +245,24 @@ int main(int argc, char **argv){
       }
 
       Eigen::Vector3d alpha;
-      alpha << 0, 0, (w_imu(2) - last_w)/0.02;
-      last_w = w_imu(2);
+      alpha << 0, 0, (w_(2) - last_w)/0.02;
+      last_w = w_(2);
 
       double w_r = (ay*vx - ax*vy)/(vx*vx + vy*vy); //(theta_r - last_theta_r) /(0.02) ;
       double vr = sqrt(vx*vx + vy*vy);
 
       Eigen::Vector3d nonholoutput = nonholonomic_output(vir_x, vir_y, theta_r, vr, w_r);
       double vr_dot = sqrt(ax*ax + ay*ay);
-      double theta_e_dot = w_r - w_imu(2);  //the error of the angular velocity
-      double x_e_dot = w_imu(2) * y_e + vr*cos(theta_e) - v_w_eta(0); //- v_w_eta(0)
-      double y_e_dot = - w_imu(2) * x_e + vr*sin(theta_e);
+      double theta_e_dot = w_r - w_(2);  //the error of the angular velocity
+      double x_e_dot = w_(2) * y_e + vr*cos(theta_e) - v_w_eta(0);
+      double y_e_dot = - w_(2) * x_e + vr*sin(theta_e);
       double w_r_dot = (jy*vx - jx*vy)/(vr*vr) - (2*vr_dot*w_r)/vr;
       double w_d_dot = w_r_dot + vr_dot*k2*y_e + vr*k2*y_e_dot + k3*theta_e_dot*cos(theta_e);
       double vd_dot = vr_dot*cos(theta_e) - vr*theta_e_dot*sin(theta_e) + k1*x_e_dot;
 
-      Eigen::Vector3d omega_m(0 , 0 , w_imu(2));
       Eigen::Vector3d nonlinearterm;
 
-      //nonlinearterm =omega_m.cross(omega_m.cross(r_c2_p));
-
-      nonlinearterm = R_pl_B*(omega_m.cross(v_p)) - alpha.cross(r_c2_p) - omega_m.cross(omega_m.cross(r_c2_p));
-
-      //  R_-1 * omega x v - omega_dot x rcp - omega x (omega x r)
+      nonlinearterm = w_.cross(v_p) - alpha.cross(r_p_c2) - w_.cross(w_.cross(r_p_c2));
 
       if( nonholoutput(0) > 10 ){
         nonholoutput(0) = 10;
@@ -294,7 +287,6 @@ int main(int argc, char **argv){
       FL_des(0) = cmd_(0);   // + nonlinearterm(0);// + vd_dot ;
       FL_des(1) = cmd_(1);   // + w_d_dot;
       FL_des(2) = 1.0*(desired_pose.pose.position.z - pose(2)) + 0.6*(0 - vel(2)) + mp*g/2.0;
-      std::cout << "FL_des：" << FL_des << std::endl << tick << std::endl;
 
       desired_force.x = FL_des(0);
       desired_force.y = FL_des(1);

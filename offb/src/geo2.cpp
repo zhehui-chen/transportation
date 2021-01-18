@@ -23,7 +23,10 @@
 #include <queue>
 #include <nav_msgs/Odometry.h>
 
-#define length 0.18;
+#define length 0.18
+#define PI 3.1415926
+double mp = 0.5, g = 9.8, kd = mp*g/(2*length), bd = 2.0, mF = 1.0, Md = 1.5;
+
 geometry_msgs::PoseStamped desired_pose;
 Eigen::Vector3d pose, vel, ang;
 Eigen::Vector4d ori;
@@ -34,8 +37,6 @@ bool flag = false;
 bool force_control = false;
 
 Eigen::Vector3d p_c2;
-Eigen::Vector3d last_p_c2;
-Eigen::Vector3d v_c2;
 Eigen::Matrix3d payload_Rotation;
 Eigen::Matrix3d uav_rotation;
 
@@ -92,8 +93,8 @@ Eigen::VectorXd poly_t(double t){
   return data;
 }
 
-Eigen::Vector3d pfc;
-Eigen::Vector3d f, fb, vb;
+Eigen::Vector3d p_F_c2;
+Eigen::Vector3d FF_I, FF_B, vb;
 //lpf lpx(5,0.02);
 //lpf lpy(5,0.02);
 int count_ = 0;
@@ -101,34 +102,34 @@ std::queue<double> pos_x_buffer;
 std::queue<double> pos_y_buffer;
 Eigen::VectorXd coeff_x, coeff_y;
 
-double last_time;
-double tmpx, tmpy;
-double last_tmp_x, last_tmp_y;
-double r, fd, an;
-double mp = 0.5, kd = 0.5;
+double last_time = 0;
+double tmpx = 0, tmpy = 0;
+double last_tmp_x = 0, last_tmp_y = 0;
+double r, Fn, an;
 double command;
-double last_vec_x, last_vec_y, last_vx, last_vy;
-double cur_time;
-void  est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
+double last_vec_x = 0, last_vec_y = 0, last_vx = 0, last_vy = 0;
+double cur_time = 0;
+void est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
   est_force = *msg;
-  f << est_force.x, est_force.y, est_force.z;
-  pfc = pose - uav_rotation * Eigen::Vector3d(0, 0, 0.05);  // offset x from uav to connector
+  FF_I << est_force.x, est_force.y, est_force.z;
 
-  p_c2 = pfc + (f/f.norm()) * 0.18;
+  p_F_c2 = pose - uav_rotation * Eigen::Vector3d(0, 0, 0.05);  // offset x from uav to connector
+  p_c2 = p_F_c2 + (FF_I/FF_I.norm()) * length;
+
   double dt = ros::Time::now().toSec() - last_time;
 
-  v_c2 = p_c2 - last_p_c2;
+  payload_yaw = atan2( tmpy - last_tmp_y, tmpx - last_tmp_x);
 
-  payload_yaw = atan2( tmpy - last_tmp_y, tmpx-last_tmp_x);
   if(payload_yaw < 0){
-    payload_yaw += 2*3.1415926;
+    payload_yaw += 2*PI;
   }
+
   payload_Rotation << cos(payload_yaw),  -sin(payload_yaw),   0,
                       sin(payload_yaw),   cos(payload_yaw),   0,
                                      0,                  0,   1;
 
   //change the force from inertial frame to body.
-  if((count_ %1 ==0) && (pos_x_buffer.size()>7)){
+  if((count_ %1 == 0) && (pos_x_buffer.size()>7)){
     pos_x_buffer.pop();
     pos_y_buffer.pop();
     pos_x_buffer.push(p_c2(0));
@@ -185,12 +186,12 @@ void  est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
     coeff_y = (w.transpose() * w).inverse() * w.transpose()* ty;
 
     double t = 0.14;   //t=0.14
-    tmpx = coeff_x(0)*1 + coeff_x(1)*t + coeff_x(2)*t*t + coeff_x(3)*1*t*t*t + coeff_x(4)*t*t*t*t + coeff_x(5)*t*t*t*t*t;
-    tmpy = coeff_y(0)*1 + coeff_y(1)*t + coeff_y(2)*t*t + coeff_y(3)*1*t*t*t + coeff_y(4)*t*t*t*t + coeff_y(5)*t*t*t*t*t;
+    tmpx = coeff_x(0)*1 + coeff_x(1)*t + coeff_x(2)*t*t + coeff_x(3)*t*t*t + coeff_x(4)*t*t*t*t + coeff_x(5)*t*t*t*t*t;
+    tmpy = coeff_y(0)*1 + coeff_y(1)*t + coeff_y(2)*t*t + coeff_y(3)*t*t*t + coeff_y(4)*t*t*t*t + coeff_y(5)*t*t*t*t*t;
     tmpx = 0.7*last_tmp_x + 0.3*tmpx;    // filter
     tmpy = 0.7*last_tmp_y + 0.3*tmpy;
 
-    double dt = cur_time - ros::Time::now().toSec();
+    double dt = cur_time - ros::Time::now().toSec(); //?
     cur_time = ros::Time::now().toSec();
 
     double vec_x = tmpx - last_tmp_x;
@@ -201,37 +202,34 @@ void  est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
     // double vy = v_c2_truth(1);
     // double vec_x = v_c2_truth(0);
     // double vec_y = v_c2_truth(1);
-    double ax = (vx-last_vx)/dt;
-    double ay = (vy-last_vy)/dt;
+    double ax = (vx - last_vx)/dt;
+    double ay = (vy - last_vy)/dt;
     double v = sqrt(vx*vx + vy*vy);
 
-    Eigen::Vector3d offset_b = payload_Rotation*(f/f.norm()) * 0.18;
+    Eigen::Vector3d offset_b = payload_Rotation*(FF_I/FF_I.norm()) * length;
 
-    r = (v*v*v)/fabs(vx*ay - vy*ax);
+    r = (v*v*v)/fabs(vx*ay - vy*ax); //?
     an = (v*v)/r;
-    fd = mp/2 * an;
+    Fn = mp/2 * an;
 
-    //std::cout << "radius : " << r << std::endl;
-    //(0-vb(0))/0.5+ (fb(0))/1.0,
-    //x = 0
-    double fy = fb(1);
+    double fy = FF_B(1);
     double dx = offset_b(1);
-    double xd = r;
-    // std::cout << "dx " <<dx << std::endl;
+
     if((last_vec_x * vec_y - last_vec_y * vec_x)<0){
-      //determine wheather the motion is CCW or CW, if CW fd and xd is negative.
-      fd = fd * -1.0;
+      //determine wheather the motion is CCW or CW, if CW Fn and dx is negative.
+      Fn = Fn * -1.0;
       dx = dx * -1.0;
     }
+
     kappa.x = r;
-    kappa.y = fd;
+    kappa.y = Fn;
     kappa.z = dx;
-    kd=1.0*0.5*9.8/2*0.18;
-    // kd = 0.0;
-    // dx = l2_tan(theta)
-    command = 1.0*(2.0*(0-vb(1)) - kd*(dx)+ 1.0*(fy-fd));
+
+    command = 1.0*(bd*(-vb(1)) - kd*dx) + 1.0*(fy - Fn); //?
+
     data.x = tmpx;
     data.y = tmpy;
+
     last_tmp_x = tmpx;
     last_tmp_y = tmpy;
     last_vec_x = vec_x;
@@ -239,11 +237,10 @@ void  est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
     last_vx = vx;
     last_vy = vy;
   }
-  else if (count_%1 == 0){
+  else if (count_ %1 == 0){
     pos_x_buffer.push(p_c2(0));
     pos_y_buffer.push(p_c2(1));
   }
-  last_p_c2 = p_c2;
   count_++;
   last_time = ros::Time::now().toSec();
 }
@@ -262,9 +259,9 @@ void odom_cb(const nav_msgs::Odometry::ConstPtr& msg){
   z = msg->pose.pose.orientation.z;
   w = msg->pose.pose.orientation.w;
 
-  uav_rotation<< w*w+x*x-y*y-z*z,      2*x*y-2*w*z,     2*x*z+2*w*y,
-                    2*x*y +2*w*z,  w*w-x*x+y*y-z*z,     2*y*z-2*w*x,
-                    2*x*z -2*w*y,      2*y*z+2*w*x, w*w-x*x-y*y+z*z;
+  uav_rotation << w*w+x*x-y*y-z*z,      2*x*y-2*w*z,     2*x*z+2*w*y,
+                     2*x*y +2*w*z,  w*w-x*x+y*y-z*z,     2*y*z-2*w*x,
+                     2*x*z -2*w*y,      2*y*z+2*w*x, w*w-x*x-y*y+z*z;
 }
 
 geometry_msgs::Point force2;
@@ -280,13 +277,14 @@ void force2_cb(const geometry_msgs::WrenchStamped::ConstPtr& msg){
   force2.y = a_(1);
   force2.z = a_(2);
 }
+
 int main(int argc, char **argv){
   ros::init(argc, argv, "geo2");
   ros::NodeHandle nh;
 
+  ros::Subscriber odom_sub = nh.subscribe<nav_msgs::Odometry>("/firefly2/odometry_sensor1/odometry",3, odom_cb);
   ros::Subscriber est_force_sub = nh.subscribe<geometry_msgs::Point>("/follower_ukf/force_estimate",3, est_force_cb);
   ros::Subscriber force2_sub= nh.subscribe<geometry_msgs::WrenchStamped>("/ft_sensor2_topic",2, force2_cb);
-  ros::Subscriber odom_sub = nh.subscribe<nav_msgs::Odometry>("/firefly2/odometry_sensor1/odometry",3, odom_cb);
   ros::Subscriber model_sub = nh.subscribe<gazebo_msgs::LinkStates>("/gazebo/link_states",1, model_cb);
 
   ros::Publisher traj_pub = nh.advertise<geometry_msgs::PoseStamped>("/firefly2/command/pose",2);
@@ -340,19 +338,19 @@ int main(int argc, char **argv){
       Eigen::Vector3d p,v,a,ab;
       p << 0.0, 0.0, 0.0;
       v << 0.0, 0.0, 0.0;
-      fb = payload_Rotation * f;
+      FF_B = payload_Rotation * FF_I;
       vb = payload_Rotation * vel;
 
-      ab <<                           (0 - vb(0)) + (fb(0))/3.0,
+      ab <<                           (0 - vb(0)) + (FF_B(0))/3.0,
                                                command,
             5.0*(desired_pose.pose.position.z - pose(2)) + 2.0*(0 - vel(2)) + 0.5*0.5*9.8;
       a = payload_Rotation.transpose()*ab;
 
-      // fb = payload_Rotation * f;
+      // FF_B = payload_Rotation * f;
       // vb = payload_Rotation * vel;
 
-      // ab << (0-vb(0))/0.5+ (fb(0))/1.0,
-      //       (0-vb(1))/1.2+ (fb(1))/1.0,
+      // ab << (0-vb(0))/0.5+ (FF_B(0))/1.0,
+      //       (0-vb(1))/1.2+ (FF_B(1))/1.0,
       //       5.0*(desired_pose.pose.position.z - pose(2)) + 2.0*(0-vel(2)) + 0.5 * 0.5 * 9.8 ;
       // a = payload_Rotation.transpose() *ab;
 

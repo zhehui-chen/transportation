@@ -18,7 +18,7 @@
 #define normal
 #define PI 3.1415926
 
-double k1 = 1.0, k2 = 1.0, k3 = 1.0, kv = 2.5, kw = 7.0;
+double k1 = 1.0, k2 = 2.0, k3 = 1.0, kv = 2.5, kw = 7.0;
 double mp = 0.5, L = 1.0, g = 9.8, Izz = mp*L*L/12;
 
 geometry_msgs::PoseStamped leader_pose;

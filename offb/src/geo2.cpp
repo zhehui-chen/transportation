@@ -196,12 +196,12 @@ void est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
     double fy = FF_B(1);
     double dy = offset_b(1);
 
-    if((last_vec_x * vec_y - last_vec_y * vec_x)<0){  //不知道判斷式對不對
+    if((atan2(vy,vx) - atan2(last_vy,last_vx))<0){
       //determine wheather the motion is CCW or CW, if CW Fn and dy is negative.
       Fn = Fn * -1.0;
     }
 
-    command = mF*(bd*(-vb(1)) - kd*dy)/Md + fy - Fn; //根據公式Fn應該要是正的，感覺怪怪的
+    command = mF*(bd*(-vb(1)) - kd*dy)/Md + fy + Fn;
 
     kappa.x = r;
     kappa.y = Fn;

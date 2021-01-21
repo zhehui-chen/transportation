@@ -32,7 +32,6 @@ double vir_x, vir_y, theta_r, vx, vy, ax, ay, jx, jy;
 double last_w = 0.0;
 
 double payload_roll, payload_yaw, payload_pitch;
-Eigen::Matrix3d payload_Rotation;
 Eigen::Vector3d v_w_eta;
 Eigen::Vector3d pc2_est;
 
@@ -62,10 +61,6 @@ void imu1_cb(const sensor_msgs::Imu::ConstPtr& msg){
   w = imu_data.orientation.w;
   tf::Quaternion Q(x, y, z, w);
   tf::Matrix3x3(Q).getRPY(payload_roll, payload_pitch, payload_yaw);
-
-  payload_Rotation << w*w+x*x-y*y-z*z ,     2*x*y-2*w*z ,     2*x*z+2*w*y,
-                          2*x*y+2*w*z , w*w-x*x+y*y-z*z ,     2*y*z-2*w*x,
-                          2*x*z-2*w*y ,     2*y*z+2*w*x , w*w-x*x-y*y+z*z;
 
   R_pl_B << cos(payload_yaw), sin(payload_yaw),   0,
            -sin(payload_yaw), cos(payload_yaw),   0,

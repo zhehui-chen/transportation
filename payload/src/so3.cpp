@@ -17,7 +17,7 @@
 #include <nav_msgs/Odometry.h>
 
 double l = 0.18, L = 0.5, g = 9.81;
-Eigen::Vector3d pc1, pc2, pa, pb, pp;
+Eigen::Vector3d pc1, pc2, pa, pb;
 sensor_msgs::Imu imu_data;
 Eigen::Matrix3d payload_rotation;
 Eigen::Matrix3d uav_rotation;
@@ -45,18 +45,6 @@ void imu1_cb(const sensor_msgs::Imu::ConstPtr& msg){
 
 Eigen::Vector3d PL;
 nav_msgs::Odometry leader_pose;
-void force_cb(const geometry_msgs::Point::ConstPtr& msg){
-  Eigen::Vector3d f;
-  f << msg->x, msg->y, msg->z;
-
-  pb = PL - uav_rotation * Eigen::Vector3d(0,0,0.05);// offset x from uav to connector
-  pc1 = pb + (f/f.norm())*l;
-
-  //find pc2
-  pc2 =  pc1 +  payload_rotation * Eigen::Vector3d(-1.0,0,0);
-  pp = pc1 + payload_rotation * Eigen::Vector3d(-0.5,0,0);
-}
-
 void odometry_cb(const nav_msgs::Odometry::ConstPtr& msg){
   leader_pose = *msg;
 
@@ -73,11 +61,22 @@ void odometry_cb(const nav_msgs::Odometry::ConstPtr& msg){
                       2*x*z-2*w*y,     2*y*z+2*w*x, w*w-x*x-y*y+z*z;
 }
 
+void force_cb(const geometry_msgs::Point::ConstPtr& msg){
+  Eigen::Vector3d f;
+  f << msg->x, msg->y, msg->z;
+
+  pb = PL - uav_rotation * Eigen::Vector3d(0,0,0.05);// offset x from uav to connector
+  pc1 = pb + (f/f.norm())*l;
+
+  //find pc2
+  pc2 =  pc1 +  payload_rotation * Eigen::Vector3d(-1.0,0,0);
+}
+
 int main(int argc, char **argv){
   ros::init(argc, argv, "so3");
   ros::NodeHandle nh;
 
-  ros::Subscriber imu1_sub = nh.subscribe("/payload/IMU1", 2,imu1_cb);
+  ros::Subscriber imu1_sub = nh.subscribe("/payload/IMU1",2,imu1_cb);
   ros::Subscriber odometry_sub = nh.subscribe("/firefly1/odometry_sensor1/odometry",2,odometry_cb);
   ros::Subscriber force_sub = nh.subscribe("/leader_ukf/force_estimate",2,force_cb);
 
@@ -137,7 +136,7 @@ int main(int argc, char **argv){
 
     measure.setZero(measurementsize);
 
-    measure << pc1(0), pc1(1), pc1(2), pa(0), pa(1), (pa(2));
+    measure << pc1(0), pc1(1), pc1(2), pa(0), pa(1), pa(2);
 
     forceest1.correct(measure);
     geometry_msgs::Point point, point2, point_vel;
@@ -152,7 +151,7 @@ int main(int argc, char **argv){
 
     point2.x = pc2(0);  //position in inertial frame
     point2.y = pc2(1);
-    point2.z = pp(2);
+    point2.z = 0;
 
     vel_est_pub.publish(point_vel);
     point_pub.publish(point);

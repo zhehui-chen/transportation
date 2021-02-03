@@ -110,13 +110,10 @@ int main(int argc, char **argv){
   mnoise(mp_x,mp_x) = 1e-4;
   mnoise(mp_y,mp_y) = 1e-4;
   mnoise(mp_z,mp_z) = 1e-4;
+
   mnoise(mv_x,mv_x) = 1e-2;
   mnoise(mv_y,mv_y) = 1e-2;
   mnoise(mv_z,mv_z) = 1e-2;
-
-  mnoise(ma_x,ma_x) = 1e-4;
-  mnoise(ma_y,ma_y) = 1e-4;
-  mnoise(ma_z,ma_z) = 1e-4;
 
   mnoise(momega_x,momega_x) = 1e-2;
   mnoise(momega_y,momega_y) = 1e-2;
@@ -133,13 +130,10 @@ int main(int argc, char **argv){
   pnoise(p_x,p_x) = 1e-2;
   pnoise(p_y,p_y) = 1e-2;
   pnoise(p_z,p_z) = 1e-2;
+
   pnoise(v_x,v_x) = 1e-2;
   pnoise(v_y,v_y) = 1e-2;
   pnoise(v_z,v_z) = 1e-2;
-
-  pnoise(a_x,a_x) = 1e-2;
-  pnoise(a_y,a_y) = 1e-2;
-  pnoise(a_z,a_z) = 1e-2;
 
   pnoise(e_x,e_x) = 0.005;//0.5,調小beta收斂較快
   pnoise(e_y,e_y) = 0.005;

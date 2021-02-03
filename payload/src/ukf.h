@@ -4,9 +4,6 @@
 #include <eigen3/Eigen/Core>
 #include <iostream>
 
-
-
-
 class ukf
 {
 public:
@@ -33,7 +30,6 @@ public:
     void predict();
     void correct(Eigen::VectorXd measure);
 
-
     Eigen::VectorXd x ; //states
     Eigen::VectorXd x_a;
     Eigen::VectorXd x_a_hat;
@@ -50,8 +46,6 @@ private:
 
     Eigen::VectorXd w_c ; //weight c
     Eigen::VectorXd w_m ;  //weight m
-
-
 
     Eigen::MatrixXd x_a_sigmavector;
     Eigen::MatrixXd x_sigmavector ;
@@ -73,9 +67,6 @@ private:
     // double y_hat = 0.0;
     // double x_hat = 0.0;
 
-
 };
 
 #endif // UKF_H
-
-

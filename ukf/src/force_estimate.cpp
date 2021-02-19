@@ -227,8 +227,7 @@ int main(int argc, char **argv){
       measure << drone2_pose.pose.position.x, drone2_pose.pose.position.y, drone2_pose.pose.position.z,
                  drone2_vel.twist.linear.x, drone2_vel.twist.linear.y, drone2_vel.twist.linear.z,
                  measure_ex, measure_ey, measure_ez,
-                 drone2_imu.angular_velocity.x, drone2_imu.angular_velocity.y, drone2_imu.angular_velocity.z,
-                 drone2_imu.linear_acceleration.x, drone2_imu.linear_acceleration.y, drone2_imu.linear_acceleration.z;
+                 drone2_imu.angular_velocity.x, drone2_imu.angular_velocity.y, drone2_imu.angular_velocity.z;
 
       forceest1.qk11 = forceest1.qk1;
 

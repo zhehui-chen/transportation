@@ -76,8 +76,7 @@ void imu1_cb(const sensor_msgs::Imu::ConstPtr& msg){
 
 void est_vel_cb(const geometry_msgs::Point::ConstPtr& msg){
   Eigen::Vector3d vc1 = Eigen::Vector3d(msg->x, msg->y, msg->z);
-  Eigen::Vector3d r_c1p = Eigen::Vector3d(-0.5, 0.0, 0.0);
-  v_p = R_pl_B*vc1; // + w_.cross(r_c1p);
+  v_p = R_pl_B*vc1;
 }
 
 void pc2_cb(const geometry_msgs::Point::ConstPtr& msg){
@@ -152,7 +151,7 @@ int main(int argc, char **argv){
   //planning
   qptrajectory plan;
   path_def path;
-  trajectory_profile p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11;
+  trajectory_profile p1,p2,p3,p4,p5,p6,p7,p8;
   std::vector<trajectory_profile> data;
 
     p1.pos << 1,1,0;
@@ -195,7 +194,7 @@ int main(int argc, char **argv){
     p8.acc << 0,0,0;
     p8.yaw = 0;
 
-  path.push_back(segments(p1,p2,16.0));
+  path.push_back(segments(p1,p2,12.0));
   path.push_back(segments(p2,p3,16.0));
   path.push_back(segments(p3,p4,16.0));
   path.push_back(segments(p4,p5,16.0));
@@ -267,7 +266,7 @@ int main(int argc, char **argv){
       Eigen::Vector3d cmd_;
 
       tmp << kv * (nonholoutput(0) - v_w_eta(0)) + x_e + nonlinearterm(0) + vd_dot,
-             kw * (nonholoutput(1) - v_w_eta(2)) + sin(theta_e)/k2 + w_d_dot,   //ffy is close to zero.
+             kw * (nonholoutput(1) - v_w_eta(1)) + sin(theta_e)/k2 + w_d_dot,   //ffy is close to zero.
              0;
 
       Eigen::Matrix3d M;

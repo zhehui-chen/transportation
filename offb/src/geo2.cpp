@@ -1,3 +1,4 @@
+
 #include <ros/ros.h>
 #include <geometric_controller.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -24,7 +25,7 @@
 
 #define length 0.18
 #define PI 3.1415926
-double mp = 0.5, g = 9.8, kd = mp*g/(2*length), bd = 2.0, mF = 1.0, Md = 1.5;
+double mp = 0.5, g = 9.8, kd = mp*g/(2*length), bd = 2.0, mF = 1.0, Md = 1.5, kf1 = 2.0;
 
 geometry_msgs::PoseStamped desired_pose;
 Eigen::Vector3d pose, vel, ang;
@@ -129,7 +130,7 @@ void est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
          poly_t(0.04).transpose(),
          poly_t(0.06).transpose(),
          poly_t(0.08).transpose(),
-         poly_t(0.1).transpose(),
+         poly_t(0.10).transpose(),
          poly_t(0.12).transpose();
 
     double t1,t2,t3,t4,t5,t6,t7;
@@ -193,15 +194,15 @@ void est_force_cb(const geometry_msgs::Point::ConstPtr& msg){
     an = (v*v)/r;
     Fn = mp/2 * an;
 
-    double fy = FF_B(1);
-    double dy = offset_b(1);
+    //double fy = FF_B(1);
+    double dy = -offset_b(1);
 
     if((atan2(vy,vx) - atan2(last_vy,last_vx))<0){
       //determine wheather the motion is CCW or CW, if CW Fn and dy is negative.
       Fn = Fn * -1.0;
     }
 
-    command = mF*(bd*(-vb(1)) - kd*dy)/Md + fy + Fn;
+    command = mF*(bd*-vb(1) - kd*dy)/Md + Fn;
 
     kappa.x = r;
     kappa.y = Fn;
@@ -275,8 +276,6 @@ int main(int argc, char **argv){
   triggered = false;
   ros::Rate loop_rate(50.0);
 
-  Eigen::Vector4d output;
-
   desired_pose.pose.position.x = -0.3;
   desired_pose.pose.position.y = 0.0;
   desired_pose.pose.position.z = 1.3;
@@ -302,7 +301,7 @@ int main(int argc, char **argv){
       FF_B = payload_Rotation * FF_I;
       vb = payload_Rotation * vel;
 
-      ab <<                           (0 - vb(0)) + (FF_B(0))/3.0,
+      ab <<                              kf1*-vb(0) + FF_B(0),
                                                command,
             5.0*(desired_pose.pose.position.z - pose(2)) + 2.0*(0 - vel(2)) + 0.5*mp*g;
       a = payload_Rotation.transpose()*ab;

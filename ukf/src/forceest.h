@@ -46,7 +46,6 @@ enum measurement{
   measurementsize
 };
 
-
 class forceest : public ukf{
 public:
   forceest(int x, int y) : ukf(x,y){

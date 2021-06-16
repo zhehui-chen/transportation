@@ -144,7 +144,7 @@ void ukf::correct(Eigen::VectorXd measure){
     Eigen::MatrixXd y_err;
     Eigen::MatrixXd y_err_t;
     y_err = ?;
-    y_err_t = err.transpose();
+    y_err_t = y_err.transpose();
 
     P_yy += ?;
   }
